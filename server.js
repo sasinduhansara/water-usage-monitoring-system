@@ -13,14 +13,18 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ===== CHECK ENV =====
+// ===== ENV CHECK =====
 if (!process.env.MONGODB_URI) {
-  console.error("❌ MONGODB_URI missing in .env");
+  console.error("❌ MONGODB_URI missing");
   process.exit(1);
 }
 
-// ===== MongoDB =====
-const client = new MongoClient(process.env.MONGODB_URI);
+// ===== MongoDB (FIXED SSL CONFIG) =====
+const client = new MongoClient(process.env.MONGODB_URI, {
+  serverSelectionTimeoutMS: 10000,
+  tls: true,
+  retryWrites: true,
+});
 
 let db;
 let dbReady = false;
@@ -41,7 +45,7 @@ async function connectDB() {
     dbReady = true;
     console.log("✅ MongoDB Connected");
   } catch (err) {
-    console.error("❌ MongoDB Error:", err);
+    console.error("❌ MongoDB Error:", err.message);
   }
 }
 
@@ -52,6 +56,7 @@ app.post("/api/register", async (req, res) => {
   if (!dbReady) return res.status(503).json({ error: "DB not ready" });
 
   const { name, email, password } = req.body;
+
   if (!name || !email || !password)
     return res.status(400).json({ error: "All fields required" });
 
@@ -94,7 +99,11 @@ app.post("/api/login", async (req, res) => {
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
@@ -103,7 +112,7 @@ app.post("/api/login", async (req, res) => {
 
 // ================= WATER =================
 
-// ESP SEND DATA
+// ESP DATA RECEIVER
 app.post("/api/water", async (req, res) => {
   try {
     const { total, daily, monthly } = req.body;
@@ -119,16 +128,19 @@ app.post("/api/water", async (req, res) => {
       await db.collection("water_history").insertOne(liveWaterData);
     }
 
-    console.log("📡 ESP:", liveWaterData);
+    console.log("📡 ESP DATA:", liveWaterData);
 
-    res.json({ success: true, liveWaterData });
+    res.json({
+      success: true,
+      liveWaterData,
+    });
   } catch (err) {
-    console.error(err);
+    console.error("Water API Error:", err.message);
     res.status(500).json({ error: "Water update failed" });
   }
 });
 
-// REACT GET LIVE DATA
+// LIVE DATA FOR REACT
 app.get("/api/water", (req, res) => {
   res.json(liveWaterData);
 });
@@ -141,8 +153,8 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// START SERVER
-app.listen(PORT, async () => {
+// ===== START SERVER (FIXED FOR RENDER) =====
+app.listen(PORT, "0.0.0.0", async () => {
   await connectDB();
-  console.log(`🚀 Server running: http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
