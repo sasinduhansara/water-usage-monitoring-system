@@ -29,3 +29,4 @@ export const fetchWaterUsage = async () => {
     throw error;
   }
 };
+
