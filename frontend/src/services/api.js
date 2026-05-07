@@ -1,3 +1,9 @@
+
+const keepRenderAlive = () => {
+  fetch(`${import.meta.env.VITE_API_URL}/api/health`).catch(() => {});
+};
+setInterval(keepRenderAlive, 840000);
+keepRenderAlive();
 import axios from "axios";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
